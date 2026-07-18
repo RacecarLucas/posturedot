@@ -119,6 +119,17 @@ The Vite dev server proxies `/api` and `/ws` to `localhost:8000`, so no extra en
 
 ## Available Landmarks / Nodes
 
+PostureDot harvests **33 pose + 468 face + 21×2 hand = 543 landmark points** per frame, plus blendshapes, transformation matrices, and segmentation masks.
+
+### Summary Table
+
+| Model | Count | Coordinate Space | Extra Fields |
+|-------|-------|------------------|--------------|
+| Pose | 33 | normalized screen + 3D world | `visibility`, `segmentationMask` |
+| Face | 468 | normalized screen | `faceBlendshapes` (52), `facialTransformationMatrixes` |
+| Hands | 21 per hand | normalized screen + 3D world | up to 2 hands |
+| **Total** | **543** | | |
+
 ### Pose Landmarks (33)
 
 MediaPipe Pose returns 33 normalized landmarks per detected person. Each landmark has `x`, `y`, `z`, and `visibility`.
@@ -145,10 +156,15 @@ MediaPipe Pose returns 33 normalized landmarks per detected person. Each landmar
 
 **Pose connections drawn**:
 
-- Head: 0–1–2–3–7, 0–4–5–6–8
-- Mouth: 9–10
-- Torso/arms: 11–13–15–17/19/21, 12–14–16–18/20/22, 11–12, 11–23, 12–24, 23–24
-- Legs: 23–25–27–29–31, 24–26–28–30–32
+| Region | Connection indices |
+|--------|-------------------|
+| Head | 0–1, 1–2, 2–3, 3–7, 0–4, 4–5, 5–6, 6–8 |
+| Mouth | 9–10 |
+| Left arm | 11–13, 13–15, 15–17, 15–19, 15–21 |
+| Right arm | 12–14, 14–16, 16–18, 16–20, 16–22 |
+| Torso | 11–12, 11–23, 12–24, 23–24 |
+| Left leg | 23–25, 25–27, 27–29, 29–31 |
+| Right leg | 24–26, 26–28, 28–30, 30–32 |
 
 ### Hand Landmarks (21 per hand)
 
@@ -169,36 +185,67 @@ MediaPipe Hands returns up to 2 hands × 21 landmarks each. Each landmark has `x
 | 10 | middle finger pip | | |
 
 **Hand connections drawn**:
-- Thumb: 0–1–2–3–4
-- Index: 0–5–6–7–8
-- Middle: 0–9–10–11–12
-- Ring: 0–13–14–15–16
-- Pinky: 0–17–18–19–20
-- Palm: 5–9–13–17
+
+| Finger | Connection indices |
+|--------|---------------------|
+| Thumb | 0–1, 1–2, 2–3, 3–4 |
+| Index | 0–5, 5–6, 6–7, 7–8 |
+| Middle | 0–9, 9–10, 10–11, 11–12 |
+| Ring | 0–13, 13–14, 14–15, 15–16 |
+| Pinky | 0–17, 17–18, 18–19, 19–20 |
+| Palm | 5–9, 9–13, 13–17 |
 
 ### Face Landmarks (468)
 
-MediaPipe Face Mesh returns 468 landmarks covering the entire face:
+MediaPipe Face Mesh returns 468 landmarks covering the entire face. In the UI all 468 are rendered as small orange dots. The full set is not individually named, but the key regions and example indices are:
 
-- **0–10**: central face contour / nose bridge
-- **11–20**: inner lip and chin
-- **21–30**: right eyebrow
-- **31–40**: left eyebrow
-- **41–70**: eyes (irises, eyelids)
-- **71–80**: nose bottom
-- **81–90**: upper lip
-- **91–100**: lower lip
-- **101–127**: left eye region
-- **128–154**: right eye region
-- **155–168**: face oval contour
-- **169–234**: left face region
-- **235–288**: nose region
-- **289–338**: right face region
-- **339–378**: upper lip outline
-- **379–418**: lower lip outline
-- **419–468**: eyes and eyebrows detail
+| Region | Indices | Description |
+|--------|---------|-------------|
+| Face oval | 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109 | Outer face contour |
+| Left eyebrow | 70, 63, 105, 66, 107, 55, 65, 52, 53, 46 | Left eyebrow points |
+| Right eyebrow | 336, 296, 334, 293, 300, 276, 283, 282, 285, 295 | Right eyebrow points |
+| Left eye | 33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7 | Left eye contour and iris |
+| Right eye | 362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382 | Right eye contour and iris |
+| Nose bridge | 6, 197, 195, 5, 4, 1, 19, 94, 2 | Nose top to tip |
+| Nose bottom | 20, 60, 75, 97, 99, 101, 119, 121, 123, 125, 141, 238, 241, 250, 245, 244, 243, 242 | Lower nose and nostrils |
+| Upper lip | 61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291 | Upper lip outline |
+| Lower lip | 146, 91, 181, 84, 17, 314, 405, 321, 375, 291 | Lower lip outline |
+| Jaw/chin | 178, 179, 180, 181, 401, 402, 403, 404, 152 | Jawline and chin |
+| Left cheek | 127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152 | Left cheek region |
+| Right cheek | 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152 | Right cheek region |
 
-In the UI, all 468 face landmarks are rendered as small dots.
+### Face Blendshapes (52)
+
+MediaPipe Face Mesh returns 52 facial expression coefficients. Each blendshape has a `categoryName` and a `score` (0–1).
+
+| # | Name | # | Name | # | Name |
+|---|------|---|------|---|------|
+| 1 | browDownLeft | 2 | browDownRight | 3 | browInnerUp |
+| 4 | browOuterUpLeft | 5 | browOuterUpRight | 6 | cheekPuff |
+| 7 | cheekSquintLeft | 8 | cheekSquintRight | 9 | eyeBlinkLeft |
+| 10 | eyeBlinkRight | 11 | eyeLookDownLeft | 12 | eyeLookDownRight |
+| 13 | eyeLookInLeft | 14 | eyeLookInRight | 15 | eyeLookOutLeft |
+| 16 | eyeLookOutRight | 17 | eyeLookUpLeft | 18 | eyeLookUpRight |
+| 19 | eyeSquintLeft | 20 | eyeSquintRight | 21 | eyeWideLeft |
+| 22 | eyeWideRight | 23 | jawForward | 24 | jawLeft |
+| 25 | jawOpen | 26 | jawRight | 27 | mouthClose |
+| 28 | mouthDimpleLeft | 29 | mouthDimpleRight | 30 | mouthFrownLeft |
+| 31 | mouthFrownRight | 32 | mouthFunnel | 33 | mouthLeft |
+| 34 | mouthLowerDownLeft | 35 | mouthLowerDownRight | 36 | mouthPressLeft |
+| 37 | mouthPressRight | 38 | mouthPucker | 39 | mouthRight |
+| 40 | mouthRollLower | 41 | mouthRollUpper | 42 | mouthShrugLower |
+| 43 | mouthShrugUpper | 44 | mouthSmileLeft | 45 | mouthSmileRight |
+| 46 | mouthStretchLeft | 47 | mouthStretchRight | 48 | mouthUpperUpLeft |
+| 49 | mouthUpperUpRight | 50 | noseSneerLeft | 51 | noseSneerRight |
+| 52 | (neutral / unused) | | | | |
+
+### Facial Transformation Matrix
+
+A 4×4 matrix representing the 3D rotation and translation of the face in camera space. This is useful for head-pose estimation.
+
+### Body Segmentation Mask
+
+A binary/person mask covering the detected person. It is drawn on the canvas as a translucent overlay but not persisted to the database because it is not JSON-serializable.
 
 ---
 
