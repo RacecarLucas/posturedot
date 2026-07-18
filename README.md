@@ -31,16 +31,19 @@ The entire pipeline runs in the browser for the heavy inference (MediaPipe model
 ## Architecture
 
 ```
-┌─────────────────────┐      WebSocket/REST      ┌─────────────────────┐
-│  Browser (Frontend) │  <──────────────────>  │  FastAPI (Backend)  │
-│  - React + Vite     │                        │  - SQLite storage   │
-│  - MediaPipe (GPU)  │                        │  - Session/Frame CRUD│
-└─────────────────────┘                        └─────────────────────┘
+┌─────────────────────┐      HTTP / WebSocket      ┌─────────────────────────┐
+│  Browser (Frontend) │  <────────────────────>  │  Backend                │
+│  - React + Vite     │                            │  - FastAPI + SQLite     │
+│  - MediaPipe (GPU)  │                            │  - OR                   │
+└─────────────────────┘                            │  - Cloudflare Workers   │
+                                                   │    + D1                 │
+                                                   └─────────────────────────┘
 ```
 
 - **Frontend**: React, TypeScript, Vite. Runs MediaPipe in the browser via `@mediapipe/tasks-vision`.
-- **Backend**: FastAPI, SQLAlchemy, SQLite. Receives landmark frames and stores them.
-- **Communication**: HTTP `POST` for frame persistence, WebSocket for live broadcasts.
+- **Backend (Python)**: FastAPI, SQLAlchemy, SQLite. Receives landmark frames and stores them. Includes WebSocket live broadcast.
+- **Backend (Workers)**: Hono, Cloudflare D1. Receives landmark frames via REST. No WebSocket in this version.
+- **Communication**: HTTP `POST` for frame persistence. WebSocket is optional (Python backend only).
 
 ---
 
@@ -54,7 +57,7 @@ The entire pipeline runs in the browser for the heavy inference (MediaPipe model
 - **Skeleton-only mode** (hide video feed)
 - **Data inspector** showing live harvested info
 - **Session persistence** with raw frame storage
-- **Fetchable API** via FastAPI, deployable to Render or other hosts
+- **Fetchable API** via FastAPI or Cloudflare Workers + D1
 
 ---
 
@@ -379,23 +382,57 @@ Health check.
 
 ## Deployment
 
-### Recommended: Render (free)
+### Option A: Cloudflare Workers + D1 (no credit card needed)
+
+This is the recommended path if you cannot use a credit card. The backend is in `backend-workers/` and uses **Hono** + **D1**.
+
+1. Sign up at [cloudflare.com](https://cloudflare.com) (free).
+2. Install `wrangler` globally or use `npx`:
+   ```bash
+   cd backend-workers
+   npm install
+   ```
+3. Create the D1 database:
+   ```bash
+   npx wrangler d1 create posturedot-db
+   ```
+4. Copy the `database_id` from the output into `wrangler.toml` (copy from `wrangler.toml.example`).
+5. Run the schema:
+   ```bash
+   npx wrangler d1 execute posturedot-db --file=./schema.sql
+   ```
+6. Deploy:
+   ```bash
+   npx wrangler deploy
+   ```
+7. Copy the Workers URL (e.g. `https://posturedot-api.your-account.workers.dev`).
+8. In `frontend/.env`, set:
+   ```
+   VITE_API_URL=https://posturedot-api.your-account.workers.dev
+   ```
+9. Rebuild and deploy the frontend (e.g., Vercel, Cloudflare Pages).
+
+See `backend-workers/README.md` for more details.
+
+### Option B: Render (requires card)
+
+Render requires a payment card on file even for the free plan.
 
 1. Push this repo to GitHub.
-2. Sign up at [render.com](https://render.com) (free, no credit card required).
+2. Sign up at [render.com](https://render.com).
 3. Create a new **Web Service** from your GitHub repo.
-4. Point the service at the `backend/` directory.
-5. Render reads `backend/render.yaml`. Update `YOUR_USERNAME` in that file to your GitHub username.
-6. Deploy and copy the public URL (e.g. `https://posturedot-api.onrender.com`).
+4. Set **Root Directory** to `backend` and **Dockerfile Path** to `./Dockerfile`.
+5. Keep the **Free** plan.
+6. Deploy and copy the public URL.
 7. In `frontend/.env`, set:
    ```
    VITE_API_URL=https://posturedot-api.onrender.com
    ```
-8. Rebuild and deploy the frontend (Vercel, Cloudflare Pages, Render static site, etc.).
+8. Rebuild and deploy the frontend.
 
-### Alternative: Cloudflare Tunnel (expose localhost)
+### Option C: Cloudflare Tunnel (expose localhost)
 
-If you want a public URL without deploying:
+If you just want a public URL without deploying:
 
 1. Sign up at [cloudflare.com](https://cloudflare.com) and install `cloudflared`.
 2. Run:
@@ -404,21 +441,24 @@ If you want a public URL without deploying:
    ```
 3. Copy the public URL and set it as `VITE_API_URL` in `frontend/.env`.
 
-### Note on Cloudflare Workers
-
-Cloudflare Workers does **not** natively run Python/FastAPI. Workers supports JavaScript, TypeScript, Rust, and WebAssembly. If you want a Cloudflare-native stack, you would need to rewrite the backend in TypeScript/Hono and use **Cloudflare D1** instead of SQLite.
 
 ---
 
 ## Environment Variables
 
-### Backend (`backend/.env`)
+### Python Backend (`backend/.env`)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8000` | Server port |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins. Use `*` for any, or set your frontend domain. |
 | `DATABASE_URL` | `sqlite:///./posturedot.db` | SQLAlchemy database URL. Use PostgreSQL in production. |
+
+### Cloudflare Workers Backend (`backend-workers/wrangler.toml`)
+
+| Variable | Description |
+|----------|-------------|
+| `DB` | D1 database binding. Set `database_id` after creating the D1 database. |
 
 ### Frontend (`frontend/.env`)
 

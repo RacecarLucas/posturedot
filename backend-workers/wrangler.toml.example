@@ -1,0 +1,10 @@
+name = "posturedot-api"
+main = "src/index.ts"
+compatibility_date = "2024-06-20"
+compatibility_flags = ["nodejs_compat"]
+
+# Bind D1 database
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "posturedot-db"
+# database_id = "your-database-id-here"
